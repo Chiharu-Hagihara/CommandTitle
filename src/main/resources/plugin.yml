@@ -1,3 +1,4 @@
 name: CommandTitle
 version: ${project.version}
 main: mc.mec.commandtitle.CommandTitle
+ctitle:
