@@ -67,7 +67,6 @@ class CommandTitle : JavaPlugin() {
                 }
             }
             for (player in Bukkit.getOnlinePlayers()) {
-                player.playSound(player.location, Sound.ENDERDRAGON_GROWL, 1F, 1F)
                 sendTitle(player, main, sub, 10, time, 10)
             }
         }
