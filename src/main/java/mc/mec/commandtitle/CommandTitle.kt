@@ -1,7 +1,6 @@
 package mc.mec.commandtitle
 
 import org.bukkit.Bukkit
-import org.bukkit.Sound
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
@@ -20,13 +19,14 @@ class CommandTitle : JavaPlugin() {
 
     val prefix = "§b[CommandTitle]"
 
-    var skip = false
-    var time = 50
-    var main = ""
-    var mode = "main"
-    var sub = ""
-
     override fun onCommand(sender: CommandSender, command: Command, label: String?, args: Array<String>): Boolean {
+
+        var skip = false
+        var time = 50
+        var main = ""
+        var mode = "main"
+        var sub = ""
+
         if (command.name == "ctitle") {
             if (args.isEmpty()) {
                 sender.sendMessage("§e==========$prefix§e==========")
