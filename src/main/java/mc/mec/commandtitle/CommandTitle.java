@@ -21,7 +21,7 @@ public class CommandTitle extends JavaPlugin {
         // Plugin shutdown logic
     }
 
-    String prefix = "§e§l[§d§lMan10TitleBar§e§l]§f§l";
+    String prefix = "§e§l[CommandTitle]§f§l";
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -32,11 +32,10 @@ public class CommandTitle extends JavaPlugin {
                 sender.sendMessage("§d/mtitle <main> | <sub> | <time>");
                 sender.sendMessage("");
                 sender.sendMessage("§e===================================");
-                sender.sendMessage("§d§lCreated By Sho0");
                 return false;
             }
-            if(!sender.hasPermission("man10.title")){
-                sender.sendMessage(prefix + "あなたには権限がありません");
+            if(!sender.hasPermission("ctitle.use")){
+                sender.sendMessage(prefix + "§c§lYou don't have permission.");
                 return false;
             }
             boolean skip = false;
