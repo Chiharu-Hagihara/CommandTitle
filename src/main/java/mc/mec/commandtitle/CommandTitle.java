@@ -8,12 +8,23 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 public class CommandTitle extends JavaPlugin {
+
+    private String netMinecraftserver = "net.minecraft.server.";
+
+    private Object enumTitle, enumSubtitle;
+    private Constructor<?> constructorTitle, constructorTime;
+    private Method methodChatSerializer, methodHandle, methodSendpacket;
+    private Field fieldConnection;
+
     @Override
     public void onEnable() {
         // Plugin startup logic
-
+        TitleSender();
     }
 
     @Override
@@ -29,7 +40,7 @@ public class CommandTitle extends JavaPlugin {
             if(args.length == 0){
                 sender.sendMessage("§e==========" + prefix + "§e==========");
                 sender.sendMessage("");
-                sender.sendMessage("§d/mtitle <main> | <sub> | <time>");
+                sender.sendMessage("§d/ctitle <main> | <sub> | <time>");
                 sender.sendMessage("");
                 sender.sendMessage("§e===================================");
                 return false;
@@ -70,57 +81,97 @@ public class CommandTitle extends JavaPlugin {
                 }
             }
             for(Player player : Bukkit.getOnlinePlayers()){
+                setTime(player, 0, time, 0);
                 player.playSound(player.getLocation(), Sound.ENDERDRAGON_GROWL,1,1);
-                sendTitle(player, main, sub, 0, time, 0);
+                sendTitle(player, main, sub);
             }
         }
         return false;
     }
 
-    public void sendPacket(Player player, Object packet) {
+    public void TitleSender() {
         try {
-            Object handle = player.getClass().getMethod("getHandle").invoke(player);
-            Object playerConnection = handle.getClass().getField("playerConnection").get(handle);
-            playerConnection.getClass().getMethod("sendPacket", getNMSClass("Packet")).invoke(playerConnection, packet);
+            String[] tmpPackage = Bukkit.getServer().getClass().getPackage().getName().split("\\.");
+            String tmpVersion = tmpPackage[tmpPackage.length - 1] + ".";
+
+            netMinecraftserver += tmpVersion;
+
+            Class<?> tmpPacketPlayout = getNMSClass("PacketPlayOutTitle"),
+                    tmpIchatBase = getNMSClass("IChatBaseComponent"),
+                    tmpEnumTitleAction = getNMSClass("PacketPlayOutTitle$EnumTitleAction");
+
+            enumTitle = tmpEnumTitleAction.getDeclaredField("TITLE").get(null);
+            enumSubtitle = tmpEnumTitleAction.getDeclaredField("SUBTITLE").get(null);
+
+            constructorTitle = tmpPacketPlayout.getConstructor(tmpEnumTitleAction, tmpIchatBase);
+            constructorTime = tmpPacketPlayout.getConstructor(int.class, int.class, int.class);
+
+            methodChatSerializer = getNMSClass("IChatBaseComponent$ChatSerializer").getMethod("a", String.class);
+            methodSendpacket = getNMSClass("PlayerConnection").getMethod("sendPacket", getNMSClass("Packet"));
+
+            try {
+                methodHandle = Class.forName("org.bukkit.craftbukkit." + tmpVersion + "entity.CraftPlayer")
+                        .getMethod("getHandle");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            fieldConnection = getNMSClass("EntityPlayer").getField("playerConnection");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public Class<?> getNMSClass(String name) {
-        try {
-            return Class.forName("net.minecraft.server."
-                    + Bukkit.getServer().getClass().getPackage().getName().split("\\.")[3] + "." + name);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-        return null;
+    public void resetTitle(Player player) {
+        sendTitle(player, "", "");
     }
 
-    public void sendTitle(Player player, String title, String subtitle, int fadeInTime, int showTime, int fadeOutTime) {
+    public void sendTitle(Player player, String title, String subtitle) {
         try {
-            Object chatTitle = getNMSClass("IChatBaseComponent").getDeclaredClasses()[0].getMethod("a", String.class)
-                    .invoke(null, "{\"text\": \"" + title + "\"}");
-            Constructor<?> titleConstructor = getNMSClass("PacketPlayOutTitle").getConstructor(
-                    getNMSClass("PacketPlayOutTitle").getDeclaredClasses()[0], getNMSClass("IChatBaseComponent"),
-                    int.class, int.class, int.class);
-            Object packet = titleConstructor.newInstance(
-                    getNMSClass("PacketPlayOutTitle").getDeclaredClasses()[0].getField("TITLE").get(null), chatTitle,
-                    fadeInTime, showTime, fadeOutTime);
+            if (title != null) {
+                sendPacket(player, constructorTitle.newInstance(
+                        enumTitle,
+                        methodChatSerializer.invoke(null, "{\"text\":\"" + title + "\"}")));
+            }
 
-            Object chatsTitle = getNMSClass("IChatBaseComponent").getDeclaredClasses()[0].getMethod("a", String.class)
-                    .invoke(null, "{\"text\": \"" + subtitle + "\"}");
-            Constructor<?> timingTitleConstructor = getNMSClass("PacketPlayOutTitle").getConstructor(
-                    getNMSClass("PacketPlayOutTitle").getDeclaredClasses()[0], getNMSClass("IChatBaseComponent"),
-                    int.class, int.class, int.class);
-            Object timingPacket = timingTitleConstructor.newInstance(
-                    getNMSClass("PacketPlayOutTitle").getDeclaredClasses()[0].getField("SUBTITLE").get(null), chatsTitle,
-                    fadeInTime, showTime, fadeOutTime);
+            if (subtitle != null) {
+                sendPacket(player, constructorTitle.newInstance(
+                        enumSubtitle,
+                        methodChatSerializer.invoke(null, "{\"text\":\"" + subtitle + "\"}")));
+            }
+        } catch (IllegalAccessException
+                | InstantiationException
+                | IllegalArgumentException
+                | InvocationTargetException e) {
+            e.printStackTrace();
+        }
+    }
 
-            sendPacket(player, packet);
-            sendPacket(player, timingPacket);
+    public void setTime(Player player, int feedIn, int titleShow, int feedOut) {
+        try {
+            sendPacket(player, constructorTime.newInstance(feedIn, titleShow, feedOut));
+        } catch (IllegalAccessException
+                | InstantiationException
+                | IllegalArgumentException
+                | InvocationTargetException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendPacket(Player player, Object packet) {
+        try {
+            methodSendpacket.invoke(fieldConnection.get(methodHandle.invoke(player)), packet);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private Class<?> getNMSClass(String name) {
+        try {
+            return Class.forName(netMinecraftserver + name);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
     }
 }
